@@ -1,3 +1,5 @@
+from abc import ABC
+
 import numpy as np
 import gym
 from collections import deque
@@ -22,11 +24,9 @@ class ExperienceReplay:
 
         for exp in exp_sample:
             state, action, reward, next_state, done = exp
-            state = np.concatenate((state['observation'], state['desired_goal']))
             states.append(state)
             actions.append(action)
             rewards.append(reward)
-            next_state = np.concatenate((next_state['observation'], next_state['desired_goal']))
             next_states.append(next_state)
             dones.append(done)
 
@@ -63,3 +63,25 @@ class OUNoise(object):
         self.sigma = self.max_sigma - (self.max_sigma - self.min_sigma) * min(1.0, t/self.decay_period)
 
         return np.clip(action + ou_state, self.low, self.high)
+
+
+class NormalizedEnv(gym.ActionWrapper):
+
+    def action(self, action):
+        act_k = (self.action_space.high - self.action_space.low)/2.
+        act_b = (self.action_space.high + self.action_space.low)/2.
+        return act_k * action + act_b
+
+    def reverse_action(self, action):
+        act_k_inv = 2./(self.action_space.high - self.action_space.low)
+        act_b = (self.action_space.high + self.action_space.low)/2.
+        return act_k_inv * (action - act_b)
+
+
+class RewardWrap(gym.RewardWrapper):
+
+    def reward(self, reward):
+        if reward >= 0:
+            return 4*reward
+
+        return reward

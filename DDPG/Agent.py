@@ -8,12 +8,13 @@ from torch.autograd.variable import Variable
 
 
 class Agent:
-    def __init__(self, env, hidden_size=256, actor_lr=1e-4, critic_lr=1e-3, gamma=0.99, tau=1e-2, max_memory=50000):
+    def __init__(self, env, hidden_size=256, actor_lr=1e-4, critic_lr=1e-3, gamma=0.99, tau=1e-3, max_memory=int(1e6)):
         obs = env.reset()
         self.num_states = obs['desired_goal'].shape[0] + obs['observation'].shape[0]
         self.num_actions = env.action_space.shape[0]
         self.gamma = gamma
         self.tau = tau
+        self.action_max = env.action_space.high[0]
 
         self.actor = Actor(self.num_states, hidden_size, self.num_actions)
         self.critic = Critic(self.num_states + self.num_actions, hidden_size, 1)
@@ -28,17 +29,14 @@ class Agent:
             target_param.data.copy_(param.data)
 
         self.experience_replay = ExperienceReplay(max_memory)
-        self.critic_criterion = nn.MSELoss()
+        self.critic_loss_func = nn.MSELoss()
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
 
     def get_action(self, state):
-        obs = state['observation']
-        goal = state['desired_goal']
-        state = np.concatenate((obs, goal))
         state = Variable(torch.from_numpy(state).float().unsqueeze(0))
         action = self.actor.forward(state)
-        action = action.detach().numpy()[0, 0]
+        action = action.detach().numpy()[0]
         return action
 
     def update(self, size):
@@ -48,21 +46,46 @@ class Agent:
         rewards = torch.FloatTensor(rewards)
         next_states = torch.FloatTensor(next_states)
 
-        vals = self.critic.forward(states, actions)
-        next_actions = self.target_actor.forward(next_states)
-        next_Q = self.target_critic.forward(next_states, next_actions.detach())
-        Qprime = rewards + self.gamma * next_Q
-        critic_loss = self.critic_criterion(vals, Qprime)
+        # vals = self.critic.forward(states, actions)
+        # next_actions = self.target_actor.forward(next_states)
+        # next_Q = self.target_critic.forward(next_states, next_actions.detach())
+        # discounted_Q = self.gamma * next_Q
+        # rewards = rewards.reshape((128, 1))
+        # Qprime = rewards + discounted_Q
+        # critic_loss = self.critic_loss_func(vals, Qprime)
+        #
+        # self.critic_optimizer.zero_grad()
+        # critic_loss.backward()
+        # self.critic_optimizer.step()
+        #
+        # policy_loss = - self.critic.forward(states, self.actor.forward(states)).mean()
+        #
+        # self.actor_optimizer.zero_grad()
+        # policy_loss.backward()
+        # self.actor_optimizer.step()
+        with torch.no_grad():
+            next_actions = self.target_actor.forward(next_states)
+            q_next = self.target_critic.forward(next_states, next_actions).detach()
+            target_q = rewards.reshape((128,1)) + self.gamma * q_next
+            target_q = target_q.detach()
+            c = 1/ (1-self.gamma)
+            target_q = torch.clamp(target_q, -c, 0)
 
-        policy_loss = -self.critic.forward(states, self.actor.forward(states)).mean()
-
+        real_q = self.critic.forward(states, actions)
+        dif = (target_q - real_q)
+        critic_loss = dif.pow(2).mean()
+        real_actions = self.actor.forward(states)
+        actor_loss = -self.critic.forward(states, real_actions).mean()
+        actor_loss += (real_actions/self.action_max).pow(2).mean()
         self.actor_optimizer.zero_grad()
-        policy_loss.backward()
+        actor_loss.backward()
         self.actor_optimizer.step()
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
+
+
 
         # update target networks
         for target_param, param in zip(self.target_actor.parameters(), self.actor.parameters()):
