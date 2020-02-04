@@ -28,13 +28,8 @@ def prep_reward(a_goal, d_goal, success):
     return -1 * distance
 
 
-env = NormalizedEnv(gym.make("FetchPush-v1"))
-env = gym.make("FetchReach-v1")
-print(env.reward_range)
+env = NormalizedActionEnv(gym.make("FetchPush-v1"))
 
-env = NormalizedEnv(env)
-# env = RewardWrap(env)
-# print(env.max_episode_steps)
 agent = Agent(env)
 noise = OUNoise(env.action_space)
 batch_size = 128
@@ -42,7 +37,7 @@ rewards = []
 avg_rewards = []
 success_rates = []
 success = 0
-for episode in range(250):
+for episode in range(100):
     goal, achieved_goal, state, state_false = unpack_observation(env.reset())
     noise.reset()
     episode_reward = 0
@@ -53,8 +48,7 @@ for episode in range(250):
         action = noise.get_action(action, step)
         new_obs, reward, done, info = env.step(action)
         goal, achieved_goal, new_state, new_state_false = unpack_observation(new_obs)
-        # exp = (state, action, reward, new_state, done)
-        # agent.experience_replay.add_experience(exp)
+
         s = info['is_success']
         if s:
             success += 1
@@ -87,7 +81,7 @@ for episode in range(250):
         "episode: {}, reward: {}, average _reward: {} \n".format(episode, np.round(episode_reward, decimals=2),
                                                                  np.mean(rewards[-10:])))
 
-# input('Press any key for testing')
+
 done = False
 s = False
 

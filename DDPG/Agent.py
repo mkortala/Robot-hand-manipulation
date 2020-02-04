@@ -46,23 +46,6 @@ class Agent:
         rewards = torch.FloatTensor(rewards)
         next_states = torch.FloatTensor(next_states)
 
-        # vals = self.critic.forward(states, actions)
-        # next_actions = self.target_actor.forward(next_states)
-        # next_Q = self.target_critic.forward(next_states, next_actions.detach())
-        # discounted_Q = self.gamma * next_Q
-        # rewards = rewards.reshape((128, 1))
-        # Qprime = rewards + discounted_Q
-        # critic_loss = self.critic_loss_func(vals, Qprime)
-        #
-        # self.critic_optimizer.zero_grad()
-        # critic_loss.backward()
-        # self.critic_optimizer.step()
-        #
-        # policy_loss = - self.critic.forward(states, self.actor.forward(states)).mean()
-        #
-        # self.actor_optimizer.zero_grad()
-        # policy_loss.backward()
-        # self.actor_optimizer.step()
         with torch.no_grad():
             next_actions = self.target_actor.forward(next_states)
             q_next = self.target_critic.forward(next_states, next_actions).detach()

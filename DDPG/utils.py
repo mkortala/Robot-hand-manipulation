@@ -65,7 +65,7 @@ class OUNoise(object):
         return np.clip(action + ou_state, self.low, self.high)
 
 
-class NormalizedEnv(gym.ActionWrapper):
+class NormalizedActionEnv(gym.ActionWrapper):
 
     def action(self, action):
         act_k = (self.action_space.high - self.action_space.low)/2.
@@ -78,10 +78,4 @@ class NormalizedEnv(gym.ActionWrapper):
         return act_k_inv * (action - act_b)
 
 
-class RewardWrap(gym.RewardWrapper):
 
-    def reward(self, reward):
-        if reward >= 0:
-            return 4*reward
-
-        return reward
